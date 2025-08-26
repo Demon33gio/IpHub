@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python3
 import os
 import sys
@@ -7,7 +8,10 @@ import json
 import requests
 import time
 import threading
+import random
+import re
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
 
 # Colors
 GREEN = '\033[92m'
@@ -30,13 +34,45 @@ def print_banner():
     print(f"  | $$  | $$$$$$$/| $$$$$$$$| $$  | $$| $$$$$$$ ")
     print(f"  | $$  | $$____/ | $$__  $$| $$  | $$| $$__  $$")
     print(f"  | $$  | $$      | $$  | $$| $$  | $$| $$  \ $$")
-    print(f" /$$$$$$| $$      | $$  | $$|  $$$$$$/| $$$$$$$/")
-    print(f"|______/|__/      |__/  |__/ \______/ |_______/ ")
+    print(f" /$$$$$$| $$      | $$  | $$|  $$$$$$/ | $$$$$$$/")
+    print(f"|______/|__/      |__/  |__/ \______/  |_______/ ")
     print(f"                                                ")
     print(f"                                                ")
     print(f"                                                {RESET}")
     print(f"{YELLOW}                  Made by marzi tools{RESET}")
     print()
+
+def animate_scanning(text, stop_event):
+    """Animation for scanning processes"""
+    chars = ['|', '/', '-', '\\']
+    i = 0
+    while not stop_event.is_set():
+        print(f'\r{BLUE}{text} {chars[i]}{RESET}', end='', flush=True)
+        i = (i + 1) % len(chars)
+        time.sleep(0.2)
+
+def print_section_header(title):
+    """Print formatted section headers"""
+    print(f"\n{CYAN}{'='*60}{RESET}")
+    print(f"{CYAN}{title.center(60)}{RESET}")
+    print(f"{CYAN}{'='*60}{RESET}\n")
+
+def print_result(title, value, color=WHITE):
+    """Print formatted results"""
+    print(f"{BLUE}{title}: {color}{value}{RESET}")
+
+def validate_ip(ip):
+    """Validate IP address format"""
+    try:
+        socket.inet_aton(ip)
+        return True
+    except socket.error:
+        return False
+
+def validate_domain(domain):
+    """Validate domain format"""
+    pattern = r'^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z]{2,})+$'
+    return re.match(pattern, domain) is not None
 
 def print_menu():
     print(f"{CYAN}---------------------- Tools ----------------------{RESET}")
@@ -54,50 +90,69 @@ def print_menu():
     print(f"[{GREEN}10{RESET}] Get MAC")
     print(f"[{GREEN}11{RESET}] Service Info")
     print(f"[{GREEN}12{RESET}] Whois lookup")
+    print(f"[{GREEN}13{RESET}] DNS Lookup")
+    print(f"[{GREEN}14{RESET}] Reverse DNS")
+    print(f"[{GREEN}15{RESET}] HTTP Headers Check")
     print()
     print(f"{CYAN}----------------------------- Others----------------------------{RESET}")
-    print(f"[{GREEN}13{RESET}] Nmap scan")
-    print(f"[{GREEN}14{RESET}] TCP Scan")
-    print(f"[{GREEN}15{RESET}] UDP Scan")
-    print(f"[{GREEN}16{RESET}] Trace Path")
-    print(f"[{GREEN}17{RESET}] Version")
+    print(f"[{GREEN}16{RESET}] Nmap scan")
+    print(f"[{GREEN}17{RESET}] TCP Scan")
+    print(f"[{GREEN}18{RESET}] UDP Scan")
+    print(f"[{GREEN}19{RESET}] Trace Path")
+    print(f"[{GREEN}20{RESET}] Subnet Calculator")
+    print(f"[{GREEN}21{RESET}] Blacklist Check")
+    print(f"[{GREEN}22{RESET}] Save Results")
+    print(f"[{GREEN}23{RESET}] Version")
     print()
 
 def ip_info():
     print(f"{CYAN}{{¿}} Enter IP{RESET}")
     ip = input("> ")
     
+    if not validate_ip(ip):
+        print(f"{RED}Error: Invalid IP address{RESET}")
+        input("\nPress Enter to continue...")
+        return
+    
     try:
-        # Validate IP address
-        socket.inet_aton(ip)
+        print_section_header("IP INFORMATION")
+        print(f"{BLUE}{{/}} Gathering information...{RESET}", end='', flush=True)
         
-        # Get IP information from ip-api.com
+        stop_event = threading.Event()
+        anim_thread = threading.Thread(target=animate_scanning, 
+                                     args=("Gathering information", stop_event))
+        anim_thread.start()
+        
         url = f"http://ip-api.com/json/{ip}"
-        response = requests.get(url)
+        response = requests.get(url, timeout=10)
         data = response.json()
         
+        stop_event.set()
+        anim_thread.join()
+        
+        print(f"\r{CYAN}{'='*60}{RESET}")
+        
         if data['status'] == 'success':
-            print()
-            print(f"{BLUE}City: {WHITE}{data.get('city', 'N/A')}{RESET}")
-            print(f"{BLUE}Country: {WHITE}{data.get('country', 'N/A')}{RESET}")
-            print(f"{BLUE}Region: {WHITE}{data.get('regionName', 'N/A')}{RESET}")
-            print(f"{BLUE}ZIP: {WHITE}{data.get('zip', 'N/A')}{RESET}")
-            print(f"{BLUE}Latitude: {WHITE}{data.get('lat', 'N/A')}{RESET}")
-            print(f"{BLUE}Longitude: {WHITE}{data.get('lon', 'N/A')}{RESET}")
-            print(f"{BLUE}Timezone: {WHITE}{data.get('timezone', 'N/A')}{RESET}")
-            print(f"{BLUE}ISP: {WHITE}{data.get('isp', 'N/A')}{RESET}")
-            print(f"{BLUE}Organization: {WHITE}{data.get('org', 'N/A')}{RESET}")
-            print(f"{BLUE}AS: {WHITE}{data.get('as', 'N/A')}{RESET}")
+            print_result("IP Address", data.get('query', 'N/A'), GREEN)
+            print_result("Country", data.get('country', 'N/A'))
+            print_result("Region", data.get('regionName', 'N/A'))
+            print_result("City", data.get('city', 'N/A'))
+            print_result("ZIP Code", data.get('zip', 'N/A'))
+            print_result("Timezone", data.get('timezone', 'N/A'))
+            print_result("ISP", data.get('isp', 'N/A'))
+            print_result("Organization", data.get('org', 'N/A'))
+            print_result("AS", data.get('as', 'N/A'))
             
             lat = data.get('lat')
             lon = data.get('lon')
             if lat and lon:
-                print(f"{GREEN}Link: {YELLOW}https://www.google.com/maps?q={lat},{lon}{RESET}")
+                print_result("Coordinates", f"{lat}, {lon}")
+                print_result("Google Maps", f"https://www.google.com/maps?q={lat},{lon}", YELLOW)
         else:
             print(f"{RED}Error: Could not retrieve information for {ip}{RESET}")
             
-    except socket.error:
-        print(f"{RED}Error: Invalid IP address{RESET}")
+    except requests.exceptions.RequestException:
+        print(f"{RED}Error: Network connection failed{RESET}")
     except Exception as e:
         print(f"{RED}Error: {str(e)}{RESET}")
     
@@ -107,28 +162,22 @@ def port_scan():
     print(f"{CYAN}{{¿}} Enter IP{RESET}")
     ip = input("> ")
     
+    if not validate_ip(ip):
+        print(f"{RED}Error: Invalid IP address{RESET}")
+        input("\nPress Enter to continue...")
+        return
+    
     try:
-        # Validate IP address
-        socket.inet_aton(ip)
-        
-        print(f"{CYAN}------------------ Port Scan ------------------{RESET}")
+        print_section_header("PORT SCAN")
         print(f"{BLUE}{{/}} Scanning...{RESET}", end='', flush=True)
         
-        # Animation while scanning
-        def animate():
-            chars = ['|', '/', '-', '\\']
-            i = 0
-            while not scan_complete.is_set():
-                print(f'\r{BLUE}{{/}} Scanning... {chars[i]}{RESET}', end='', flush=True)
-                i = (i + 1) % len(chars)
-                time.sleep(0.2)
+        stop_event = threading.Event()
+        anim_thread = threading.Thread(target=animate_scanning, 
+                                     args=("Scanning ports", stop_event))
+        anim_thread.start()
         
-        scan_complete = threading.Event()
-        animation_thread = threading.Thread(target=animate)
-        animation_thread.start()
-        
-        # Common ports to scan
-        common_ports = [21, 22, 23, 25, 53, 80, 110, 135, 139, 143, 443, 445, 993, 995, 1723, 3306, 3389, 5900, 8080]
+        common_ports = [21, 22, 23, 25, 53, 80, 110, 135, 139, 143, 443, 
+                       445, 993, 995, 1723, 3306, 3389, 5900, 8080, 8443]
         open_ports = []
         
         def check_port(port):
@@ -141,28 +190,25 @@ def port_scan():
             except:
                 pass
         
-        # Use thread pool for faster scanning
-        with ThreadPoolExecutor(max_workers=50) as executor:
+        with ThreadPoolExecutor(max_workers=100) as executor:
             executor.map(check_port, common_ports)
         
-        scan_complete.set()
-        animation_thread.join()
+        stop_event.set()
+        anim_thread.join()
         
-        print(f'\r{CYAN}------------------ Port Scan ------------------{RESET}')
-        print(f"{GREEN}Ports found: {RESET}")
+        print(f"\r{CYAN}{'='*60}{RESET}")
         
         if open_ports:
+            print(f"{GREEN}Open ports found:{RESET}")
             for port in sorted(open_ports):
                 try:
                     service = socket.getservbyport(port)
-                    print(f" {GREEN}[{port}] {WHITE}- {service}{RESET}")
+                    print(f"  {GREEN}└─ {port}/TCP {WHITE}- {service}{RESET}")
                 except:
-                    print(f" {GREEN}[{port}] {WHITE}- Unknown service{RESET}")
+                    print(f"  {GREEN}└─ {port}/TCP {WHITE}- Unknown service{RESET}")
         else:
-            print(f" {RED}No open ports found{RESET}")
+            print(f"{YELLOW}No open ports found{RESET}")
             
-    except socket.error:
-        print(f"{RED}Error: Invalid IP address{RESET}")
     except Exception as e:
         print(f"{RED}Error: {str(e)}{RESET}")
     
@@ -172,86 +218,133 @@ def service_detection():
     print(f"{CYAN}{{¿}} Enter IP{RESET}")
     ip = input("> ")
     
+    if not validate_ip(ip):
+        print(f"{RED}Error: Invalid IP address{RESET}")
+        input("\nPress Enter to continue...")
+        return
+    
     try:
-        socket.inet_aton(ip)
-        print(f"{CYAN}Running service detection on {ip}...{RESET}")
+        print_section_header("SERVICE DETECTION")
+        print(f"{BLUE}{{/}} Detecting services...{RESET}", end='', flush=True)
+        
+        stop_event = threading.Event()
+        anim_thread = threading.Thread(target=animate_scanning,
+                                     args=("Detecting services", stop_event))
+        anim_thread.start()
         
         # Use nmap for service detection if available
         try:
-            result = subprocess.run(['nmap', '-sV', ip], capture_output=True, text=True, timeout=60)
+            result = subprocess.run(['nmap', '-sV', '--version-intensity', '2', ip], 
+                                  capture_output=True, text=True, timeout=120)
+            stop_event.set()
+            anim_thread.join()
+            
+            print(f"\r{CYAN}{'='*60}{RESET}")
             print(result.stdout)
-        except:
+            
+        except FileNotFoundError:
+            stop_event.set()
+            anim_thread.join()
+            
+            print(f"\r{CYAN}{'='*60}{RESET}")
             print(f"{YELLOW}Nmap not available. Using basic service detection.{RESET}")
             
             # Basic service detection using common ports
             common_services = {
-                21: 'FTP',
-                22: 'SSH',
-                23: 'Telnet',
-                25: 'SMTP',
-                53: 'DNS',
-                80: 'HTTP',
-                110: 'POP3',
-                143: 'IMAP',
-                443: 'HTTPS',
-                3306: 'MySQL',
-                3389: 'RDP'
+                21: 'FTP', 22: 'SSH', 23: 'Telnet', 25: 'SMTP', 53: 'DNS',
+                80: 'HTTP', 110: 'POP3', 143: 'IMAP', 443: 'HTTPS', 
+                3306: 'MySQL', 3389: 'RDP', 5432: 'PostgreSQL'
             }
             
+            found_services = []
             for port, service in common_services.items():
                 try:
                     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                         s.settimeout(1)
                         result = s.connect_ex((ip, port))
                         if result == 0:
-                            print(f"{GREEN}[+] {service} detected on port {port}{RESET}")
+                            found_services.append((port, service))
                 except:
                     pass
-                    
-    except socket.error:
-        print(f"{RED}Error: Invalid IP address{RESET}")
+            
+            if found_services:
+                print(f"{GREEN}Services detected:{RESET}")
+                for port, service in found_services:
+                    print(f"  {GREEN}└─ {port}/TCP: {service}{RESET}")
+            else:
+                print(f"{YELLOW}No common services detected{RESET}")
+                
+    except subprocess.TimeoutExpired:
+        stop_event.set()
+        anim_thread.join()
+        print(f"\r{RED}Scan timed out{RESET}")
     except Exception as e:
+        stop_event.set()
+        anim_thread.join()
         print(f"{RED}Error: {str(e)}{RESET}")
     
     input("\nPress Enter to continue...")
 
 def arp_scan():
-    print(f"{CYAN}Running ARP scan on local network...{RESET}")
+    print_section_header("ARP SCAN")
+    print(f"{BLUE}{{/}} Scanning local network...{RESET}", end='', flush=True)
     
     try:
+        stop_event = threading.Event()
+        anim_thread = threading.Thread(target=animate_scanning,
+                                     args=("ARP scanning", stop_event))
+        anim_thread.start()
+        
         # Try to get local IP and subnet
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(("8.8.8.8", 80))
         local_ip = s.getsockname()[0]
         s.close()
         
-        # Calculate subnet
         subnet = '.'.join(local_ip.split('.')[:3]) + '.0/24'
-        print(f"{BLUE}Scanning subnet: {subnet}{RESET}")
+        print_result("\nNetwork", subnet)
         
         # Use arp-scan if available
         try:
-            result = subprocess.run(['arp-scan', '--localnet'], capture_output=True, text=True)
+            result = subprocess.run(['arp-scan', '--localnet'], 
+                                  capture_output=True, text=True, timeout=30)
+            stop_event.set()
+            anim_thread.join()
+            
+            print(f"\r{CYAN}{'='*60}{RESET}")
             print(result.stdout)
-        except:
-            # Fallback to basic arp table
+            
+        except FileNotFoundError:
+            stop_event.set()
+            anim_thread.join()
+            
+            print(f"\r{CYAN}{'='*60}{RESET}")
             print(f"{YELLOW}arp-scan not available. Showing current ARP table.{RESET}")
-            if os.name == 'posix':  # Unix-like systems
+            
+            if os.name == 'posix':
                 result = subprocess.run(['arp', '-a'], capture_output=True, text=True)
-                print(result.stdout)
-            else:  # Windows
+            else:
                 result = subprocess.run(['arp', '-a'], capture_output=True, text=True)
-                print(result.stdout)
-                
+            
+            print(result.stdout)
+            
     except Exception as e:
+        stop_event.set()
+        anim_thread.join()
         print(f"{RED}Error: {str(e)}{RESET}")
     
     input("\nPress Enter to continue...")
 
 def ping_sweep():
-    print(f"{CYAN}Running ping sweep on local network...{RESET}")
+    print_section_header("PING SWEEP")
+    print(f"{BLUE}{{/}} Scanning local network...{RESET}", end='', flush=True)
     
     try:
+        stop_event = threading.Event()
+        anim_thread = threading.Thread(target=animate_scanning,
+                                     args=("Ping sweeping", stop_event))
+        anim_thread.start()
+        
         # Get local IP and subnet
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(("8.8.8.8", 80))
@@ -259,70 +352,115 @@ def ping_sweep():
         s.close()
         
         subnet = '.'.join(local_ip.split('.')[:3])
-        print(f"{BLUE}Sweeping subnet: {subnet}.0/24{RESET}")
+        print_result("\nSubnet", f"{subnet}.0/24")
         
         active_hosts = []
         
         def ping_host(host_ip):
             try:
-                if os.name == 'posix':  # Unix-like systems
+                if os.name == 'posix':
                     result = subprocess.run(['ping', '-c', '1', '-W', '1', host_ip], 
                                           capture_output=True, text=True, timeout=2)
                     if result.returncode == 0:
                         active_hosts.append(host_ip)
-                        print(f"{GREEN}[+] {host_ip} is up{RESET}")
-                else:  # Windows
+                else:
                     result = subprocess.run(['ping', '-n', '1', '-w', '1000', host_ip], 
                                           capture_output=True, text=True, timeout=2)
                     if "Reply from" in result.stdout:
                         active_hosts.append(host_ip)
-                        print(f"{GREEN}[+] {host_ip} is up{RESET}")
             except:
                 pass
         
         # Ping all hosts in the subnet
-        print(f"{BLUE}Scanning...{RESET}")
-        with ThreadPoolExecutor(max_workers=20) as executor:
+        with ThreadPoolExecutor(max_workers=50) as executor:
             for i in range(1, 255):
                 host_ip = f"{subnet}.{i}"
                 executor.submit(ping_host, host_ip)
         
-        print(f"{GREEN}Scan complete. Found {len(active_hosts)} active hosts.{RESET}")
+        stop_event.set()
+        anim_thread.join()
         
+        print(f"\r{CYAN}{'='*60}{RESET}")
+        
+        if active_hosts:
+            print(f"{GREEN}Active hosts found:{RESET}")
+            for host in sorted(active_hosts):
+                print(f"  {GREEN}└─ {host}{RESET}")
+            print(f"\n{BLUE}Total active hosts: {GREEN}{len(active_hosts)}{RESET}")
+        else:
+            print(f"{YELLOW}No active hosts found{RESET}")
+            
     except Exception as e:
+        stop_event.set()
+        anim_thread.join()
         print(f"{RED}Error: {str(e)}{RESET}")
     
     input("\nPress Enter to continue...")
 
 def netstat():
-    print(f"{CYAN}Running netstat...{RESET}")
+    print_section_header("NETSTAT")
+    print(f"{BLUE}{{/}} Gathering network statistics...{RESET}", end='', flush=True)
     
     try:
-        if os.name == 'posix':  # Unix-like systems
-            result = subprocess.run(['netstat', '-tunap'], capture_output=True, text=True)
-        else:  # Windows
-            result = subprocess.run(['netstat', '-ano'], capture_output=True, text=True)
+        stop_event = threading.Event()
+        anim_thread = threading.Thread(target=animate_scanning,
+                                     args=("Running netstat", stop_event))
+        anim_thread.start()
         
+        if os.name == 'posix':
+            result = subprocess.run(['netstat', '-tunap'], 
+                                  capture_output=True, text=True, timeout=10)
+        else:
+            result = subprocess.run(['netstat', '-ano'], 
+                                  capture_output=True, text=True, timeout=10)
+        
+        stop_event.set()
+        anim_thread.join()
+        
+        print(f"\r{CYAN}{'='*60}{RESET}")
         print(result.stdout)
+        
     except Exception as e:
+        stop_event.set()
+        anim_thread.join()
         print(f"{RED}Error: {str(e)}{RESET}")
     
     input("\nPress Enter to continue...")
 
 def traceroute():
     print(f"{CYAN}{{¿}} Enter IP or hostname{RESET}")
-    host = input("> ")
+    host = input("> ").strip()
+    
+    if not host:
+        print(f"{RED}Error: Please enter a valid host{RESET}")
+        input("\nPress Enter to continue...")
+        return
     
     try:
-        print(f"{CYAN}Tracing route to {host}...{RESET}")
+        print_section_header("TRACEROUTE")
+        print(f"{BLUE}{{/}} Tracing route...{RESET}", end='', flush=True)
         
-        if os.name == 'posix':  # Unix-like systems
-            result = subprocess.run(['traceroute', host], capture_output=True, text=True)
-        else:  # Windows
-            result = subprocess.run(['tracert', host], capture_output=True, text=True)
+        stop_event = threading.Event()
+        anim_thread = threading.Thread(target=animate_scanning,
+                                     args=("Tracing route", stop_event))
+        anim_thread.start()
         
+        if os.name == 'posix':
+            result = subprocess.run(['traceroute', host], 
+                                  capture_output=True, text=True, timeout=60)
+        else:
+            result = subprocess.run(['tracert', host], 
+                                  capture_output=True, text=True, timeout=60)
+        
+        stop_event.set()
+        anim_thread.join()
+        
+        print(f"\r{CYAN}{'='*60}{RESET}")
         print(result.stdout)
+        
     except Exception as e:
+        stop_event.set()
+        anim_thread.join()
         print(f"{RED}Error: {str(e)}{RESET}")
     
     input("\nPress Enter to continue...")
@@ -336,18 +474,6 @@ def advanced_ip_scan():
     
     # List of available APIs
     apis = {
-        'ipapi': {
-            'name': 'ipapi',
-            'url': 'https://ipapi.com/',
-            'key_required': True,
-            'key': ''
-        },
-        'ipgeolocation': {
-            'name': 'IP Geolocation',
-            'url': 'https://ipgeolocation.io/',
-            'key_required': True,
-            'key': ''
-        },
         'ipinfo': {
             'name': 'IPInfo',
             'url': 'https://ipinfo.io/',
@@ -368,68 +494,36 @@ def advanced_ip_scan():
     print(f"{CYAN}{{¿}} Enter IP{RESET}")
     ip = input("> ")
     
+    if not validate_ip(ip):
+        print(f"{RED}Error: Invalid IP address{RESET}")
+        input("\nPress Enter to continue...")
+        return
+    
     try:
-        socket.inet_aton(ip)
+        print_section_header("ADVANCED IP SCAN")
         
         # Try each API
         for api_name, api_data in apis.items():
             if api_data['key_required'] and not api_data['key']:
                 continue
                 
-            print(f"{CYAN}\nTrying {api_data['name']} API...{RESET}")
+            print(f"{CYAN}Trying {api_data['name']} API...{RESET}")
             
             try:
                 if api_name == 'ipinfo':
                     url = f"https://ipinfo.io/{ip}/json"
-                    response = requests.get(url)
+                    response = requests.get(url, timeout=10)
                     data = response.json()
                     
-                    print(f"{BLUE}IP: {WHITE}{data.get('ip', 'N/A')}{RESET}")
-                    print(f"{BLUE}Hostname: {WHITE}{data.get('hostname', 'N/A')}{RESET}")
-                    print(f"{BLUE}City: {WHITE}{data.get('city', 'N/A')}{RESET}")
-                    print(f"{BLUE}Region: {WHITE}{data.get('region', 'N/A')}{RESET}")
-                    print(f"{BLUE}Country: {WHITE}{data.get('country', 'N/A')}{RESET}")
-                    print(f"{BLUE}Location: {WHITE}{data.get('loc', 'N/A')}{RESET}")
-                    print(f"{BLUE}Organization: {WHITE}{data.get('org', 'N/A')}{RESET}")
-                    print(f"{BLUE}Postal: {WHITE}{data.get('postal', 'N/A')}{RESET}")
-                    print(f"{BLUE}Timezone: {WHITE}{data.get('timezone', 'N/A')}{RESET}")
-                    
-                elif api_name == 'ipapi' and api_data['key']:
-                    url = f"http://api.ipapi.com/api/{ip}?access_key={api_data['key']}"
-                    response = requests.get(url)
-                    data = response.json()
-                    
-                    if 'success' in data and not data['success']:
-                        print(f"{RED}API Error: {data.get('error', {}).get('info', 'Unknown error')}{RESET}")
-                    else:
-                        print(f"{BLUE}IP: {WHITE}{data.get('ip', 'N/A')}{RESET}")
-                        print(f"{BLUE}Type: {WHITE}{data.get('type', 'N/A')}{RESET}")
-                        print(f"{BLUE}Continent: {WHITE}{data.get('continent_name', 'N/A')}{RESET}")
-                        print(f"{BLUE}Country: {WHITE}{data.get('country_name', 'N/A')}{RESET}")
-                        print(f"{BLUE}Region: {WHITE}{data.get('region_name', 'N/A')}{RESET}")
-                        print(f"{BLUE}City: {WHITE}{data.get('city', 'N/A')}{RESET}")
-                        print(f"{BLUE}ZIP: {WHITE}{data.get('zip', 'N/A')}{RESET}")
-                        print(f"{BLUE}Latitude: {WHITE}{data.get('latitude', 'N/A')}{RESET}")
-                        print(f"{BLUE}Longitude: {WHITE}{data.get('longitude', 'N/A')}{RESET}")
-                        print(f"{BLUE}Location: {WHITE}{data.get('location', {}).get('capital', 'N/A')}{RESET}")
-                        
-                elif api_name == 'ipgeolocation' and api_data['key']:
-                    url = f"https://api.ipgeolocation.io/ipgeo?apiKey={api_data['key']}&ip={ip}"
-                    response = requests.get(url)
-                    data = response.json()
-                    
-                    print(f"{BLUE}IP: {WHITE}{data.get('ip', 'N/A')}{RESET}")
-                    print(f"{BLUE}Continent: {WHITE}{data.get('continent_name', 'N/A')}{RESET}")
-                    print(f"{BLUE}Country: {WHITE}{data.get('country_name', 'N/A')}{RESET}")
-                    print(f"{BLUE}Region: {WHITE}{data.get('state_prov', 'N/A')}{RESET}")
-                    print(f"{BLUE}City: {WHITE}{data.get('city', 'N/A')}{RESET}")
-                    print(f"{BLUE}District: {WHITE}{data.get('district', 'N/A')}{RESET}")
-                    print(f"{BLUE}ZIP: {WHITE}{data.get('zipcode', 'N/A')}{RESET}")
-                    print(f"{BLUE}Latitude: {WHITE}{data.get('latitude', 'N/A')}{RESET}")
-                    print(f"{BLUE}Longitude: {WHITE}{data.get('longitude', 'N/A')}{RESET}")
-                    print(f"{BLUE}ISP: {WHITE}{data.get('isp', 'N/A')}{RESET}")
-                    print(f"{BLUE}Organization: {WHITE}{data.get('organization', 'N/A')}{RESET}")
-                    print(f"{BLUE}Timezone: {WHITE}{data.get('time_zone', {}).get('name', 'N/A')}{RESET}")
+                    print_result("IP", data.get('ip', 'N/A'), GREEN)
+                    print_result("Hostname", data.get('hostname', 'N/A'))
+                    print_result("City", data.get('city', 'N/A'))
+                    print_result("Region", data.get('region', 'N/A'))
+                    print_result("Country", data.get('country', 'N/A'))
+                    print_result("Location", data.get('loc', 'N/A'))
+                    print_result("Organization", data.get('org', 'N/A'))
+                    print_result("Postal", data.get('postal', 'N/A'))
+                    print_result("Timezone", data.get('timezone', 'N/A'))
                     
                 print(f"{CYAN}\nRaw API response:{RESET}")
                 print(json.dumps(data, indent=2))
@@ -437,8 +531,6 @@ def advanced_ip_scan():
             except Exception as e:
                 print(f"{RED}Error with {api_data['name']} API: {str(e)}{RESET}")
                 
-    except socket.error:
-        print(f"{RED}Error: Invalid IP address{RESET}")
     except Exception as e:
         print(f"{RED}Error: {str(e)}{RESET}")
     
@@ -448,48 +540,76 @@ def os_detection():
     print(f"{CYAN}{{¿}} Enter IP{RESET}")
     ip = input("> ")
     
+    if not validate_ip(ip):
+        print(f"{RED}Error: Invalid IP address{RESET}")
+        input("\nPress Enter to continue...")
+        return
+    
     try:
-        socket.inet_aton(ip)
-        print(f"{CYAN}Running OS detection on {ip}...{RESET}")
+        print_section_header("OS DETECTION")
+        print(f"{BLUE}{{/}} Detecting OS...{RESET}", end='', flush=True)
+        
+        stop_event = threading.Event()
+        anim_thread = threading.Thread(target=animate_scanning,
+                                     args=("Detecting OS", stop_event))
+        anim_thread.start()
         
         # Use nmap for OS detection if available
         try:
-            result = subprocess.run(['nmap', '-O', ip], capture_output=True, text=True, timeout=120)
+            result = subprocess.run(['nmap', '-O', '--osscan-limit', ip], 
+                                  capture_output=True, text=True, timeout=120)
+            stop_event.set()
+            anim_thread.join()
+            
+            print(f"\r{CYAN}{'='*60}{RESET}")
             print(result.stdout)
-        except:
-            print(f"{YELLOW}Nmap not available. Using basic TTL-based OS detection.{RESET}")
+            
+        except FileNotFoundError:
+            stop_event.set()
+            anim_thread.join()
+            
+            print(f"\r{CYAN}{'='*60}{RESET}")
+            print(f"{YELLOW}Nmap not available. Using TTL-based OS detection.{RESET}")
             
             # Basic OS detection using TTL
             try:
-                if os.name == 'posix':  # Unix-like systems
-                    result = subprocess.run(['ping', '-c', '1', ip], capture_output=True, text=True, timeout=5)
-                else:  # Windows
-                    result = subprocess.run(['ping', '-n', '1', ip], capture_output=True, text=True, timeout=5)
-                
-                if "TTL=" in result.stdout or "ttl=" in result.stdout:
-                    ttl_line = [line for line in result.stdout.split('\n') if "TTL=" in line or "ttl=" in line][0]
-                    if "TTL=" in ttl_line:
-                        ttl = int(ttl_line.split("TTL=")[1].split()[0])
-                    else:
-                        ttl = int(ttl_line.split("ttl=")[1].split()[0])
-                    
-                    print(f"{BLUE}TTL: {WHITE}{ttl}{RESET}")
-                    
-                    if ttl <= 64:
-                        print(f"{BLUE}Possible OS: {WHITE}Linux/Unix{RESET}")
-                    elif ttl <= 128:
-                        print(f"{BLUE}Possible OS: {WHITE}Windows{RESET}")
-                    else:
-                        print(f"{BLUE}Possible OS: {WHITE}Network device or other{RESET}")
+                if os.name == 'posix':
+                    result = subprocess.run(['ping', '-c', '1', ip], 
+                                          capture_output=True, text=True, timeout=5)
                 else:
-                    print(f"{RED}Could not determine TTL{RESET}")
+                    result = subprocess.run(['ping', '-n', '1', ip], 
+                                          capture_output=True, text=True, timeout=5)
+                
+                output = result.stdout
+                ttl = None
+                
+                if "ttl=" in output.lower():
+                    ttl_line = [line for line in output.split('\n') if "ttl=" in line.lower()][0]
+                    ttl_match = re.search(r'ttl=(\d+)', ttl_line.lower())
+                    if ttl_match:
+                        ttl = int(ttl_match.group(1))
+                
+                if ttl:
+                    print_result("TTL", ttl)
+                    if ttl <= 64:
+                        print_result("Possible OS", "Linux/Unix", GREEN)
+                    elif ttl <= 128:
+                        print_result("Possible OS", "Windows", GREEN)
+                    else:
+                        print_result("Possible OS", "Network device or other", YELLOW)
+                else:
+                    print(f"{YELLOW}Could not determine TTL{RESET}")
                     
             except:
                 print(f"{RED}Error pinging host{RESET}")
                 
-    except socket.error:
-        print(f"{RED}Error: Invalid IP address{RESET}")
+    except subprocess.TimeoutExpired:
+        stop_event.set()
+        anim_thread.join()
+        print(f"\r{RED}Scan timed out{RESET}")
     except Exception as e:
+        stop_event.set()
+        anim_thread.join()
         print(f"{RED}Error: {str(e)}{RESET}")
     
     input("\nPress Enter to continue...")
@@ -498,11 +618,24 @@ def get_mac():
     print(f"{CYAN}{{¿}} Enter IP{RESET}")
     ip = input("> ")
     
+    if not validate_ip(ip):
+        print(f"{RED}Error: Invalid IP address{RESET}")
+        input("\nPress Enter to continue...")
+        return
+    
     try:
-        socket.inet_aton(ip)
+        print_section_header("MAC ADDRESS LOOKUP")
+        print(f"{BLUE}{{/}} Finding MAC address...{RESET}", end='', flush=True)
+        
+        stop_event = threading.Event()
+        anim_thread = threading.Thread(target=animate_scanning,
+                                     args=("Finding MAC", stop_event))
+        anim_thread.start()
         
         # Try to get MAC address using ARP
-        if os.name == 'posix':  # Unix-like systems
+        mac_address = None
+        
+        if os.name == 'posix':
             # First ping the host to populate ARP cache
             subprocess.run(['ping', '-c', '1', '-W', '1', ip], 
                          capture_output=True, timeout=5)
@@ -517,19 +650,13 @@ def get_mac():
                     if ip in line:
                         parts = line.split()
                         if len(parts) >= 3:
-                            print(f"{BLUE}MAC Address: {WHITE}{parts[2]}{RESET}")
+                            mac_address = parts[2]
                             break
-                else:
-                    print(f"{RED}Could not find MAC address for {ip}{RESET}")
-            else:
-                print(f"{RED}Could not find MAC address for {ip}{RESET}")
-                
+                            
         else:  # Windows
-            # First ping the host to populate ARP cache
             subprocess.run(['ping', '-n', '1', '-w', '1000', ip], 
                          capture_output=True, timeout=5)
             
-            # Then check ARP table
             result = subprocess.run(['arp', '-a'], capture_output=True, text=True)
             output = result.stdout
             
@@ -539,58 +666,70 @@ def get_mac():
                     if ip in line:
                         parts = line.split()
                         if len(parts) >= 2:
-                            print(f"{BLUE}MAC Address: {WHITE}{parts[1]}{RESET}")
+                            mac_address = parts[1]
                             break
-                else:
-                    print(f"{RED}Could not find MAC address for {ip}{RESET}")
-            else:
-                print(f"{RED}Could not find MAC address for {ip}{RESET}")
-                
-    except socket.error:
-        print(f"{RED}Error: Invalid IP address{RESET}")
+        
+        stop_event.set()
+        anim_thread.join()
+        
+        print(f"\r{CYAN}{'='*60}{RESET}")
+        
+        if mac_address:
+            print_result("IP Address", ip, GREEN)
+            print_result("MAC Address", mac_address)
+        else:
+            print(f"{YELLOW}Could not find MAC address for {ip}{RESET}")
+            
     except Exception as e:
+        stop_event.set()
+        anim_thread.join()
         print(f"{RED}Error: {str(e)}{RESET}")
     
     input("\nPress Enter to continue...")
 
 def service_info():
     print(f"{CYAN}{{¿}} Enter port number{RESET}")
-    port = input("> ")
+    port_input = input("> ").strip()
     
     try:
-        port = int(port)
-        if port < 1 or port > 65535:
+        port = int(port_input)
+        if not (1 <= port <= 65535):
             print(f"{RED}Error: Port must be between 1 and 65535{RESET}")
-        else:
-            try:
-                service = socket.getservbyport(port)
-                print(f"{BLUE}Service: {WHITE}{service}{RESET}")
+            input("\nPress Enter to continue...")
+            return
+            
+        print_section_header("SERVICE INFORMATION")
+        
+        try:
+            service = socket.getservbyport(port)
+            print_result("Port", port, GREEN)
+            print_result("Service", service)
+            
+            # Common service descriptions
+            service_descriptions = {
+                21: "File Transfer Protocol",
+                22: "Secure Shell",
+                23: "Telnet",
+                25: "Simple Mail Transfer Protocol",
+                53: "Domain Name System",
+                80: "Hypertext Transfer Protocol",
+                110: "Post Office Protocol v3",
+                143: "Internet Message Access Protocol",
+                443: "Hypertext Transfer Protocol Secure",
+                993: "IMAP over SSL",
+                995: "POP3 over SSL",
+                3306: "MySQL Database Service",
+                3389: "Remote Desktop Protocol",
+                5432: "PostgreSQL Database Service"
+            }
+            
+            if port in service_descriptions:
+                print_result("Description", service_descriptions[port])
                 
-                # Common service descriptions
-                service_descriptions = {
-                    21: "File Transfer Protocol",
-                    22: "Secure Shell",
-                    23: "Telnet",
-                    25: "Simple Mail Transfer Protocol",
-                    53: "Domain Name System",
-                    80: "Hypertext Transfer Protocol",
-                    110: "Post Office Protocol v3",
-                    143: "Internet Message Access Protocol",
-                    443: "Hypertext Transfer Protocol Secure",
-                    993: "IMAP over SSL",
-                    995: "POP3 over SSL",
-                    3306: "MySQL Database Service",
-                    3389: "Remote Desktop Protocol",
-                    5432: "PostgreSQL Database Service",
-                    27017: "MongoDB Database Service"
-                }
-                
-                if port in service_descriptions:
-                    print(f"{BLUE}Description: {WHITE}{service_descriptions[port]}{RESET}")
-                    
-            except:
-                print(f"{RED}Unknown service on port {port}{RESET}")
-                
+        except:
+            print_result("Port", port, GREEN)
+            print(f"{YELLOW}Unknown service on port {port}{RESET}")
+            
     except ValueError:
         print(f"{RED}Error: Port must be a number{RESET}")
     except Exception as e:
@@ -600,34 +739,52 @@ def service_info():
 
 def whois_lookup():
     print(f"{CYAN}{{¿}} Enter IP or domain{RESET}")
-    target = input("> ")
+    target = input("> ").strip()
+    
+    if not target:
+        print(f"{RED}Error: Please enter a valid target{RESET}")
+        input("\nPress Enter to continue...")
+        return
     
     try:
-        print(f"{CYAN}Running WHOIS lookup for {target}...{RESET}")
+        print_section_header("WHOIS LOOKUP")
+        print(f"{BLUE}{{/}} Querying WHOIS...{RESET}", end='', flush=True)
+        
+        stop_event = threading.Event()
+        anim_thread = threading.Thread(target=animate_scanning,
+                                     args=("WHOIS lookup", stop_event))
+        anim_thread.start()
         
         # Try to use whois command if available
         try:
-            if os.name == 'posix':  # Unix-like systems
-                result = subprocess.run(['whois', target], capture_output=True, text=True)
-            else:  # Windows (may need whois installed)
-                result = subprocess.run(['whois', target], capture_output=True, text=True)
+            if os.name == 'posix':
+                result = subprocess.run(['whois', target], 
+                                      capture_output=True, text=True, timeout=30)
+            else:
+                result = subprocess.run(['whois', target], 
+                                      capture_output=True, text=True, timeout=30)
             
+            stop_event.set()
+            anim_thread.join()
+            
+            print(f"\r{CYAN}{'='*60}{RESET}")
             print(result.stdout)
-        except:
-            # Fallback to online WHOIS service
-            print(f"{YELLOW}Local whois command not available. Using online service.{RESET}")
             
-            try:
-                url = f"https://www.whois.com/whois/{target}"
-                print(f"{GREEN}Link: {YELLOW}{url}{RESET}")
-                
-                # You could use requests with a proper WHOIS API here
-                print(f"{YELLOW}Please visit the above link for WHOIS information.{RESET}")
-                
-            except Exception as e:
-                print(f"{RED}Error: {str(e)}{RESET}")
-                
+        except FileNotFoundError:
+            stop_event.set()
+            anim_thread.join()
+            
+            print(f"\r{CYAN}{'='*60}{RESET}")
+            print(f"{YELLOW}whois command not available.{RESET}")
+            print(f"{GREEN}Online WHOIS: {YELLOW}https://www.whois.com/whois/{target}{RESET}")
+            
+    except subprocess.TimeoutExpired:
+        stop_event.set()
+        anim_thread.join()
+        print(f"\r{RED}WHOIS query timed out{RESET}")
     except Exception as e:
+        stop_event.set()
+        anim_thread.join()
         print(f"{RED}Error: {str(e)}{RESET}")
     
     input("\nPress Enter to continue...")
@@ -636,13 +793,29 @@ def nmap_scan():
     print(f"{CYAN}{{¿}} Enter IP{RESET}")
     ip = input("> ")
     
+    if not validate_ip(ip):
+        print(f"{RED}Error: Invalid IP address{RESET}")
+        input("\nPress Enter to continue...")
+        return
+    
     try:
-        socket.inet_aton(ip)
-        print(f"{CYAN}Running Nmap scan on {ip}...{RESET}")
+        print_section_header("NMAP SCAN")
+        print(f"{BLUE}{{/}} Running Nmap...{RESET}", end='', flush=True)
+        
+        stop_event = threading.Event()
+        anim_thread = threading.Thread(target=animate_scanning,
+                                     args=("Nmap scanning", stop_event))
+        anim_thread.start()
         
         # Check if nmap is available
         try:
-            result = subprocess.run(['nmap', '-v', '-A', ip], capture_output=True, text=True, timeout=300)
+            result = subprocess.run(['nmap', '-v', '-A', '--reason', ip], 
+                                  capture_output=True, text=True, timeout=300)
+            
+            stop_event.set()
+            anim_thread.join()
+            
+            print(f"\r{CYAN}{'='*60}{RESET}")
             print(result.stdout)
             
             if result.stderr:
@@ -650,13 +823,17 @@ def nmap_scan():
                 print(result.stderr)
                 
         except FileNotFoundError:
-            print(f"{RED}Nmap is not installed. Please install nmap to use this feature.{RESET}")
-        except subprocess.TimeoutExpired:
-            print(f"{RED}Nmap scan timed out.{RESET}")
+            stop_event.set()
+            anim_thread.join()
+            print(f"\r{RED}Nmap is not installed. Please install nmap to use this feature.{RESET}")
             
-    except socket.error:
-        print(f"{RED}Error: Invalid IP address{RESET}")
+    except subprocess.TimeoutExpired:
+        stop_event.set()
+        anim_thread.join()
+        print(f"\r{RED}Nmap scan timed out{RESET}")
     except Exception as e:
+        stop_event.set()
+        anim_thread.join()
         print(f"{RED}Error: {str(e)}{RESET}")
     
     input("\nPress Enter to continue...")
@@ -665,27 +842,23 @@ def tcp_scan():
     print(f"{CYAN}{{¿}} Enter IP{RESET}")
     ip = input("> ")
     
+    if not validate_ip(ip):
+        print(f"{RED}Error: Invalid IP address{RESET}")
+        input("\nPress Enter to continue...")
+        return
+    
     try:
-        socket.inet_aton(ip)
-        print(f"{CYAN}Running TCP scan on {ip}...{RESET}")
+        print_section_header("TCP SCAN")
+        print(f"{BLUE}{{/}} Scanning TCP ports...{RESET}", end='', flush=True)
         
-        # Common TCP ports to scan
-        common_ports = [21, 22, 23, 25, 53, 80, 110, 135, 139, 143, 443, 445, 993, 995, 1723, 3306, 3389, 5900, 8080]
+        stop_event = threading.Event()
+        anim_thread = threading.Thread(target=animate_scanning,
+                                     args=("TCP scanning", stop_event))
+        anim_thread.start()
+        
+        common_ports = [21, 22, 23, 25, 53, 80, 110, 135, 139, 143, 443, 
+                       445, 993, 995, 1723, 3306, 3389, 5900, 8080, 8443]
         open_ports = []
-        
-        print(f"{BLUE}Scanning...{RESET}", end='', flush=True)
-        
-        def animate():
-            chars = ['|', '/', '-', '\\']
-            i = 0
-            while not scan_complete.is_set():
-                print(f'\r{BLUE}Scanning... {chars[i]}{RESET}', end='', flush=True)
-                i = (i + 1) % len(chars)
-                time.sleep(0.2)
-        
-        scan_complete = threading.Event()
-        animation_thread = threading.Thread(target=animate)
-        animation_thread.start()
         
         def check_port(port):
             try:
@@ -697,28 +870,28 @@ def tcp_scan():
             except:
                 pass
         
-        # Use thread pool for faster scanning
-        with ThreadPoolExecutor(max_workers=50) as executor:
+        with ThreadPoolExecutor(max_workers=100) as executor:
             executor.map(check_port, common_ports)
         
-        scan_complete.set()
-        animation_thread.join()
+        stop_event.set()
+        anim_thread.join()
         
-        print(f'\r{CYAN}TCP Scan Results:{RESET}')
+        print(f"\r{CYAN}{'='*60}{RESET}")
         
         if open_ports:
+            print(f"{GREEN}Open TCP ports found:{RESET}")
             for port in sorted(open_ports):
                 try:
                     service = socket.getservbyport(port)
-                    print(f" {GREEN}[{port}/TCP] {WHITE}- {service}{RESET}")
+                    print(f"  {GREEN}└─ {port}/TCP {WHITE}- {service}{RESET}")
                 except:
-                    print(f" {GREEN}[{port}/TCP] {WHITE}- Unknown service{RESET}")
+                    print(f"  {GREEN}└─ {port}/TCP {WHITE}- Unknown service{RESET}")
         else:
-            print(f" {RED}No open TCP ports found{RESET}")
+            print(f"{YELLOW}No open TCP ports found{RESET}")
             
-    except socket.error:
-        print(f"{RED}Error: Invalid IP address{RESET}")
     except Exception as e:
+        stop_event.set()
+        anim_thread.join()
         print(f"{RED}Error: {str(e)}{RESET}")
     
     input("\nPress Enter to continue...")
@@ -727,94 +900,390 @@ def udp_scan():
     print(f"{CYAN}{{¿}} Enter IP{RESET}")
     ip = input("> ")
     
+    if not validate_ip(ip):
+        print(f"{RED}Error: Invalid IP address{RESET}")
+        input("\nPress Enter to continue...")
+        return
+    
     try:
-        socket.inet_aton(ip)
-        print(f"{CYAN}Running UDP scan on {ip}...{RESET}")
-        print(f"{YELLOW}Note: UDP scanning can be slow and unreliable.{RESET}")
+        print_section_header("UDP SCAN")
+        print(f"{BLUE}{{/}} Scanning UDP ports...{RESET}", end='', flush=True)
+        print(f"\n{YELLOW}Note: UDP scanning can be slow and unreliable.{RESET}")
         
-        # Common UDP ports to scan
-        common_ports = [53, 67, 68, 69, 123, 135, 137, 138, 139, 161, 162, 445, 514, 631, 1434, 1900, 4500, 49152]
+        stop_event = threading.Event()
+        anim_thread = threading.Thread(target=animate_scanning,
+                                     args=("UDP scanning", stop_event))
+        anim_thread.start()
+        
+        common_ports = [53, 67, 68, 69, 123, 135, 137, 138, 139, 161, 162, 
+                       445, 514, 631, 1434, 1900, 4500, 49152]
         open_ports = []
-        
-        print(f"{BLUE}Scanning...{RESET}", end='', flush=True)
-        
-        def animate():
-            chars = ['|', '/', '-', '\\']
-            i = 0
-            while not scan_complete.is_set():
-                print(f'\r{BLUE}Scanning... {chars[i]}{RESET}', end='', flush=True)
-                i = (i + 1) % len(chars)
-                time.sleep(0.2)
-        
-        scan_complete = threading.Event()
-        animation_thread = threading.Thread(target=animate)
-        animation_thread.start()
         
         def check_port(port):
             try:
                 with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-                    s.settimeout(1)
-                    # Send empty data to trigger response
+                    s.settimeout(2)
                     s.sendto(b'', (ip, port))
                     try:
                         data, addr = s.recvfrom(1024)
                         open_ports.append(port)
                     except socket.timeout:
-                        # Port might be open but not responding
                         pass
             except:
                 pass
         
-        # Use thread pool for faster scanning
         with ThreadPoolExecutor(max_workers=20) as executor:
             executor.map(check_port, common_ports)
         
-        scan_complete.set()
-        animation_thread.join()
+        stop_event.set()
+        anim_thread.join()
         
-        print(f'\r{CYAN}UDP Scan Results:{RESET}')
+        print(f"\r{CYAN}{'='*60}{RESET}")
         
         if open_ports:
+            print(f"{GREEN}Responsive UDP ports found:{RESET}")
             for port in sorted(open_ports):
                 try:
                     service = socket.getservbyport(port, 'udp')
-                    print(f" {GREEN}[{port}/UDP] {WHITE}- {service}{RESET}")
+                    print(f"  {GREEN}└─ {port}/UDP {WHITE}- {service}{RESET}")
                 except:
-                    print(f" {GREEN}[{port}/UDP] {WHITE}- Unknown service{RESET}")
+                    print(f"  {GREEN}└─ {port}/UDP {WHITE}- Unknown service{RESET}")
         else:
-            print(f" {RED}No responsive UDP ports found{RESET}")
+            print(f"{YELLOW}No responsive UDP ports found{RESET}")
             
-    except socket.error:
-        print(f"{RED}Error: Invalid IP address{RESET}")
     except Exception as e:
+        stop_event.set()
+        anim_thread.join()
         print(f"{RED}Error: {str(e)}{RESET}")
     
     input("\nPress Enter to continue...")
 
 def trace_path():
     print(f"{CYAN}{{¿}} Enter IP or hostname{RESET}")
-    host = input("> ")
+    host = input("> ").strip()
+    
+    if not host:
+        print(f"{RED}Error: Please enter a valid host{RESET}")
+        input("\nPress Enter to continue...")
+        return
     
     try:
-        print(f"{CYAN}Tracing path to {host}...{RESET}")
+        print_section_header("TRACE PATH")
+        print(f"{BLUE}{{/}} Tracing path...{RESET}", end='', flush=True)
         
-        if os.name == 'posix':  # Unix-like systems
-            result = subprocess.run(['tracepath', host], capture_output=True, text=True)
-        else:  # Windows
-            result = subprocess.run(['tracert', host], capture_output=True, text=True)
+        stop_event = threading.Event()
+        anim_thread = threading.Thread(target=animate_scanning,
+                                     args=("Tracing path", stop_event))
+        anim_thread.start()
         
+        if os.name == 'posix':
+            result = subprocess.run(['tracepath', host], 
+                                  capture_output=True, text=True, timeout=60)
+        else:
+            result = subprocess.run(['tracert', host], 
+                                  capture_output=True, text=True, timeout=60)
+        
+        stop_event.set()
+        anim_thread.join()
+        
+        print(f"\r{CYAN}{'='*60}{RESET}")
         print(result.stdout)
+        
+    except Exception as e:
+        stop_event.set()
+        anim_thread.join()
+        print(f"{RED}Error: {str(e)}{RESET}")
+    
+    input("\nPress Enter to continue...")
+
+def dns_lookup():
+    print(f"{CYAN}{{¿}} Enter domain name{RESET}")
+    domain = input("> ").strip()
+    
+    if not validate_domain(domain):
+        print(f"{RED}Error: Invalid domain format{RESET}")
+        input("\nPress Enter to continue...")
+        return
+    
+    try:
+        print_section_header("DNS LOOKUP")
+        print(f"{BLUE}{{/}} Resolving DNS...{RESET}", end='', flush=True)
+        
+        stop_event = threading.Event()
+        anim_thread = threading.Thread(target=animate_scanning,
+                                     args=("Resolving DNS", stop_event))
+        anim_thread.start()
+        
+        # Get all IP addresses for the domain
+        addresses = socket.getaddrinfo(domain, None)
+        ip_list = set()
+        
+        for addr in addresses:
+            ip_list.add(addr[4][0])
+        
+        stop_event.set()
+        anim_thread.join()
+        
+        print(f"\r{CYAN}{'='*60}{RESET}")
+        
+        if ip_list:
+            print(f"{GREEN}IP addresses found for {domain}:{RESET}")
+            for ip in ip_list:
+                print(f"  {GREEN}└─ {ip}{RESET}")
+        else:
+            print(f"{YELLOW}No IP addresses found for {domain}{RESET}")
+            
+    except socket.gaierror:
+        print(f"{RED}Error: Could not resolve domain{RESET}")
     except Exception as e:
         print(f"{RED}Error: {str(e)}{RESET}")
     
     input("\nPress Enter to continue...")
 
+def reverse_dns_lookup():
+    print(f"{CYAN}{{¿}} Enter IP address{RESET}")
+    ip = input("> ").strip()
+    
+    if not validate_ip(ip):
+        print(f"{RED}Error: Invalid IP address{RESET}")
+        input("\nPress Enter to continue...")
+        return
+    
+    try:
+        print_section_header("REVERSE DNS LOOKUP")
+        print(f"{BLUE}{{/}} Performing reverse lookup...{RESET}", end='', flush=True)
+        
+        stop_event = threading.Event()
+        anim_thread = threading.Thread(target=animate_scanning,
+                                     args=("Reverse DNS lookup", stop_event))
+        anim_thread.start()
+        
+        # Get hostname from IP
+        hostname, aliases, _ = socket.gethostbyaddr(ip)
+        
+        stop_event.set()
+        anim_thread.join()
+        
+        print(f"\r{CYAN}{'='*60}{RESET}")
+        
+        print_result("IP Address", ip, GREEN)
+        print_result("Hostname", hostname)
+        if aliases:
+            print_result("Aliases", ", ".join(aliases))
+            
+    except socket.herror:
+        print(f"{YELLOW}No reverse DNS record found for {ip}{RESET}")
+    except Exception as e:
+        print(f"{RED}Error: {str(e)}{RESET}")
+    
+    input("\nPress Enter to continue...")
+
+def http_headers_check():
+    print(f"{CYAN}{{¿}} Enter URL{RESET}")
+    url = input("> ").strip()
+    
+    if not url.startswith('http'):
+        url = 'http://' + url
+    
+    try:
+        print_section_header("HTTP HEADERS CHECK")
+        print(f"{BLUE}{{/}} Checking headers...{RESET}", end='', flush=True)
+        
+        stop_event = threading.Event()
+        anim_thread = threading.Thread(target=animate_scanning,
+                                     args=("Checking headers", stop_event))
+        anim_thread.start()
+        
+        response = requests.head(url, timeout=10, allow_redirects=True)
+        
+        stop_event.set()
+        anim_thread.join()
+        
+        print(f"\r{CYAN}{'='*60}{RESET}")
+        
+        print_result("URL", url, GREEN)
+        print_result("Status Code", response.status_code, 
+                    GREEN if response.status_code == 200 else YELLOW)
+        
+        security_headers = ['server', 'x-powered-by', 'x-frame-options', 
+                          'x-content-type-options', 'strict-transport-security',
+                          'content-security-policy']
+        
+        print(f"\n{BLUE}Security Headers:{RESET}")
+        for header in security_headers:
+            if header in response.headers:
+                print(f"  {GREEN}✓ {header}: {WHITE}{response.headers[header]}{RESET}")
+            else:
+                print(f"  {RED}✗ {header}: {YELLOW}Missing{RESET}")
+        
+        print(f"\n{BLUE}All Headers:{RESET}")
+        for header, value in response.headers.items():
+            if header not in security_headers:
+                print(f"  {BLUE}• {header}: {WHITE}{value}{RESET}")
+            
+    except requests.exceptions.RequestException as e:
+        print(f"{RED}Error: {str(e)}{RESET}")
+    except Exception as e:
+        print(f"{RED}Error: {str(e)}{RESET}")
+    
+    input("\nPress Enter to continue...")
+
+def subnet_calculator():
+    print(f"{CYAN}{{¿}} Enter IP with CIDR (e.g., 192.168.1.0/24){RESET}")
+    cidr = input("> ").strip()
+    
+    try:
+        print_section_header("SUBNET CALCULATOR")
+        
+        # Basic subnet calculation without ipaddress module
+        if '/' not in cidr:
+            print(f"{RED}Error: Please use CIDR notation (e.g., 192.168.1.0/24){RESET}")
+            input("\nPress Enter to continue...")
+            return
+        
+        ip, cidr_mask = cidr.split('/')
+        cidr_mask = int(cidr_mask)
+        
+        if not validate_ip(ip) or not (0 <= cidr_mask <= 32):
+            print(f"{RED}Error: Invalid CIDR notation{RESET}")
+            input("\nPress Enter to continue...")
+            return
+        
+        # Calculate subnet mask
+        mask = (0xffffffff << (32 - cidr_mask)) & 0xffffffff
+        subnet_mask = ".".join([str((mask >> (24 - i * 8)) & 0xff) for i in range(4)])
+        
+        # Calculate network address
+        ip_parts = list(map(int, ip.split('.')))
+        network_parts = [ip_parts[i] & (mask >> (24 - i * 8) & 0xff) for i in range(4)]
+        network_addr = ".".join(map(str, network_parts))
+        
+        # Calculate broadcast address
+        broadcast_parts = [network_parts[i] | (~mask >> (24 - i * 8) & 0xff) for i in range(4)]
+        broadcast_addr = ".".join(map(str, broadcast_parts))
+        
+        # Calculate number of hosts
+        num_hosts = 2 ** (32 - cidr_mask) - 2 if cidr_mask < 31 else 2 ** (32 - cidr_mask)
+        
+        print_result("Network Address", network_addr, GREEN)
+        print_result("Subnet Mask", subnet_mask)
+        print_result("CIDR Notation", f"/{cidr_mask}")
+        print_result("Broadcast Address", broadcast_addr)
+        print_result("Total Hosts", f"{num_hosts:,}")
+        print_result("Usable Hosts", f"{max(0, num_hosts - 2):,}" if cidr_mask < 31 else "N/A")
+        
+        if cidr_mask <= 30:
+            print_result("First Host", f"{network_addr[:-1]}1")
+            print_result("Last Host", f"{broadcast_addr[:-1]}{int(broadcast_addr.split('.')[-1]) - 1}")
+            
+    except Exception as e:
+        print(f"{RED}Error: {str(e)}{RESET}")
+    
+    input("\nPress Enter to continue...")
+
+def blacklist_check():
+    print(f"{CYAN}{{¿}} Enter IP address{RESET}")
+    ip = input("> ").strip()
+    
+    if not validate_ip(ip):
+        print(f"{RED}Error: Invalid IP address{RESET}")
+        input("\nPress Enter to continue...")
+        return
+    
+    try:
+        print_section_header("BLACKLIST CHECK")
+        print(f"{BLUE}{{/}} Checking blacklists...{RESET}", end='', flush=True)
+        
+        stop_event = threading.Event()
+        anim_thread = threading.Thread(target=animate_scanning,
+                                     args=("Checking blacklists", stop_event))
+        anim_thread.start()
+        
+        # Common blacklist DNSBLs
+        blacklists = [
+            "zen.spamhaus.org",
+            "bl.spamcop.net",
+            "dnsbl.sorbs.net",
+            "spam.dnsbl.sorbs.net",
+        ]
+        
+        results = {}
+        
+        def check_blacklist(bl):
+            try:
+                reversed_ip = ".".join(reversed(ip.split('.')))
+                lookup = f"{reversed_ip}.{bl}"
+                socket.gethostbyname(lookup)
+                results[bl] = "LISTED"
+            except socket.gaierror:
+                results[bl] = "CLEAN"
+            except:
+                results[bl] = "ERROR"
+        
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            executor.map(check_blacklist, blacklists)
+        
+        stop_event.set()
+        anim_thread.join()
+        
+        print(f"\r{CYAN}{'='*60}{RESET}")
+        
+        print_result("IP Address", ip, GREEN)
+        print(f"\n{BLUE}Blacklist Results:{RESET}")
+        
+        listed_count = 0
+        for bl, status in results.items():
+            if status == "LISTED":
+                print(f"  {RED}✗ {bl}: {status}{RESET}")
+                listed_count += 1
+            elif status == "CLEAN":
+                print(f"  {GREEN}✓ {bl}: {status}{RESET}")
+            else:
+                print(f"  {YELLOW}? {bl}: {status}{RESET}")
+        
+        print(f"\n{BLUE}Summary: {RESET}", end="")
+        if listed_count > 0:
+            print(f"{RED}Listed in {listed_count} blacklist(s){RESET}")
+        else:
+            print(f"{GREEN}Not listed in any checked blacklists{RESET}")
+            
+    except Exception as e:
+        print(f"{RED}Error: {str(e)}{RESET}")
+    
+    input("\nPress Enter to continue...")
+
+def save_results():
+    print(f"{CYAN}{{¿}} Enter text to save{RESET}")
+    text = input("> ").strip()
+    
+    if not text:
+        print(f"{YELLOW}No text to save{RESET}")
+        input("\nPress Enter to continue...")
+        return
+    
+    try:
+        filename = f"iphub_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        
+        with open(filename, 'w') as f:
+            f.write(f"IpHub Results - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write("="*50 + "\n\n")
+            f.write(text)
+        
+        print(f"{GREEN}Results saved to: {YELLOW}{filename}{RESET}")
+        
+    except Exception as e:
+        print(f"{RED}Error saving file: {str(e)}{RESET}")
+    
+    input("\nPress Enter to continue...")
+
 def version():
-    print(f"{CYAN}IpHub Version Information{RESET}")
-    print(f"{BLUE}Version: {WHITE}0.Beta{RESET}")
-    print(f"{BLUE}Author: {WHITE}marzi tools{RESET}")
-    print(f"{BLUE}Description: {WHITE}Network analysis and information gathering tool{RESET}")
-    print(f"{BLUE}License: {WHITE}For educational purposes only{RESET}")
+    print_section_header("IPHUB VERSION INFORMATION")
+    print_result("Version", "1.0 Beta", GREEN)
+    print_result("Author", "marzi tools")
+    print_result("Description", "Advanced Network Analysis Tool")
+    print_result("License", "Educational Use Only")
+    print_result("Python Version", f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")
+    print_result("Platform", sys.platform)
     
     input("\nPress Enter to continue...")
 
@@ -826,42 +1295,36 @@ def main():
         try:
             choice = input(f"{CYAN}{{#}} >{RESET} ").strip()
             
-            if choice == '1':
-                ip_info()
-            elif choice == '2':
-                port_scan()
-            elif choice == '3':
-                service_detection()
-            elif choice == '4':
-                arp_scan()
-            elif choice == '5':
-                ping_sweep()
-            elif choice == '6':
-                netstat()
-            elif choice == '7':
-                traceroute()
-            elif choice == '8':
-                advanced_ip_scan()
-            elif choice == '9':
-                os_detection()
-            elif choice == '10':
-                get_mac()
-            elif choice == '11':
-                service_info()
-            elif choice == '12':
-                whois_lookup()
-            elif choice == '13':
-                nmap_scan()
-            elif choice == '14':
-                tcp_scan()
-            elif choice == '15':
-                udp_scan()
-            elif choice == '16':
-                trace_path()
-            elif choice == '17':
-                version()
-            elif choice.lower() == 'exit' or choice.lower() == 'quit':
-                print(f"{GREEN}Goodbye!{RESET}")
+            options = {
+                '1': ip_info,
+                '2': port_scan,
+                '3': service_detection,
+                '4': arp_scan,
+                '5': ping_sweep,
+                '6': netstat,
+                '7': traceroute,
+                '8': advanced_ip_scan,
+                '9': os_detection,
+                '10': get_mac,
+                '11': service_info,
+                '12': whois_lookup,
+                '13': dns_lookup,
+                '14': reverse_dns_lookup,
+                '15': http_headers_check,
+                '16': nmap_scan,
+                '17': tcp_scan,
+                '18': udp_scan,
+                '19': trace_path,
+                '20': subnet_calculator,
+                '21': blacklist_check,
+                '22': save_results,
+                '23': version
+            }
+            
+            if choice in options:
+                options[choice]()
+            elif choice.lower() in ['exit', 'quit', 'q']:
+                print(f"\n{GREEN}Goodbye!{RESET}")
                 break
             else:
                 print(f"{RED}Invalid choice. Please try again.{RESET}")
