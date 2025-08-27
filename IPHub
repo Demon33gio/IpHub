@@ -1125,7 +1125,7 @@ def speed_test():
     print(f"{BLUE}{{/}} Testing internet speed...{RESET}", end='', flush=True)
     
     try:
-    stop_event = threading.Event()
+        stop_event = threading.Event()
         anim_thread = threading.Thread(target=animate_scanning,
                                      args=("Testing speed", stop_event))
         anim_thread.start()
@@ -1756,3 +1756,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
